@@ -1,45 +1,35 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+node_modules/
 
-# testing
-/coverage
+# next.js (frontend)
+.next/
+out/
 
-# next.js
-/.next/
-/out/
+# nestjs (backend)
+dist/
 
-# production
-/build
+# local file uploads (backend)
+backend/uploads/
+
+# env files (never commit secrets; example files are opted back in)
+.env
+.env.*
+!.env.example
 
 # misc
 .DS_Store
 *.pem
+*.tsbuildinfo
+next-env.d.ts
 
-# debug
+# logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
 # vercel
 .vercel
 
-# local file uploads
-/uploads
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# testing
+coverage/

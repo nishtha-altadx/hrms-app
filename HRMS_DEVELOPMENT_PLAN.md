@@ -2,17 +2,17 @@
 
 ## Context
 
-This is a greenfield learning/portfolio project (`d:\hrms-app` is currently empty, no git repo). The goal is a full-stack Human Resource Management System with three roles (Admin/HR, Supervisor/Manager, Employee).
+This is a full-stack Human Resource Management System (learning/portfolio project) with three roles (Admin/HR, Supervisor/Manager, Employee).
 
-**Revision note**: The original plan used a separate Express backend + Next.js frontend as two independent projects. The user has since decided to simplify: **Express is removed entirely**, and **Next.js serves as both frontend and backend**, using Next.js Route Handlers (API routes) for all server-side logic. This collapses the project into a single Next.js application, in a single GitHub repository, connecting to a **local PostgreSQL instance the user already has installed** (no Docker). The feature-by-feature build order and Git-checkpoint discipline from the original plan are unchanged — only the architecture and repo layout are updated.
+**Revision note (2nd revision)**: The project went from a two-project Express+Next.js split, to a single-Next.js-app design (Milestone 0 was built and committed on that basis), and is now moving to a **two-project split again**, per a teammate's (Siddharth's) recommendation: **frontend = Next.js, backend = NestJS**. This restores separate frontend/backend processes, but replaces Express with NestJS for a more structured, batteries-included backend (modules, DI, guards, decorators, built-in validation pipes) that pairs naturally with TypeORM. The already-committed Milestone 0 work (single Next.js app with TypeORM + a `/api/health` route) is being restructured: the Next.js app becomes the `frontend/` project (API routes and TypeORM code removed), and a new NestJS `backend/` project is created, absorbing the existing TypeORM entities/data-source setup.
 
 Key decisions (updated):
-- **Architecture**: One Next.js app (App Router) — UI pages and API routes live in the same project. No Express, no separate backend server/process.
-- **Auth**: NextAuth.js (Auth.js) with the Credentials provider (bcrypt-hashed passwords + TypeORM lookup) and the Google provider for OAuth. Sessions via NextAuth's JWT strategy (httpOnly cookies, managed by NextAuth).
-- **Database**: PostgreSQL (already installed locally) + TypeORM for entities/migrations, connected via environment variables — no Docker.
-- **Repository**: Single GitHub repo, single Next.js project (no separate `frontend/`/`backend/` folders — see structure below).
-- **File storage**: local disk (`public/uploads/` or a server-only `uploads/` folder), served via a Route Handler or Next's static file serving.
-- **Validation/forms**: Zod schemas + React Hook Form (`@hookform/resolvers/zod`) on the frontend; the same Zod schemas reused for server-side validation in Route Handlers.
+- **Architecture**: Two separate apps/processes — `frontend/` (Next.js, UI only) and `backend/` (NestJS, all REST APIs) — in **one single GitHub repository** (not two repos).
+- **Auth**: NestJS owns authentication entirely. It handles the Credentials flow (bcrypt + TypeORM `User` lookup) and Google OAuth (via `passport-google-oauth20` through NestJS's Passport integration), and issues JWT access + refresh tokens as httpOnly cookies (set by NestJS responses) consumed by the Next.js frontend. **NextAuth/Auth.js is no longer used** — it doesn't fit a setup where a separate backend, not Next.js itself, owns the session/OAuth callback.
+- **Database**: PostgreSQL (local instance already installed, `hrms_dev` database already created) + TypeORM for entities/migrations, owned entirely by the `backend/` project.
+- **Repository**: Single GitHub repo containing both `frontend/` and `backend/` as sibling folders, each with its own `package.json` (not an npm workspace unless later needed) — matches the user's original repo shape, just with NestJS instead of Express.
+- **File storage**: local disk on the backend (`backend/uploads/`), served via a NestJS static-assets route or a dedicated controller endpoint.
+- **Validation/forms**: Zod + React Hook Form on the frontend for form-level validation; NestJS's own validation (`class-validator`/`class-transformer` DTOs, its idiomatic approach) on the backend API boundary. Zod schemas are not shared across the process boundary since frontend and backend are now fully separate runtimes.
 - **Module order after Employee Management**: Attendance → Leave → Performance Reviews (unchanged).
 - **Testing**: manual, end-to-end testing per feature (Postman/Thunder Client + browser) — no automated test framework overhead up front.
 
@@ -20,216 +20,164 @@ Key decisions (updated):
 
 ## 1. Tech Stack
 
-- **Framework**: Next.js (App Router), React, TypeScript
-- **Styling**: Tailwind CSS
-- **State management**: Redux Toolkit (client-side UI/domain state), Axios (HTTP calls from client components to the app's own Route Handlers)
-- **Auth**: NextAuth.js / Auth.js — Credentials provider (email+password) and Google provider (OAuth)
-- **Database**: PostgreSQL (local instance already installed)
-- **ORM/migrations**: TypeORM
-- **Validation**: Zod (shared schemas for forms and API route input validation)
-- **Forms**: React Hook Form + `@hookform/resolvers/zod`
-- **Password hashing**: bcrypt (only for Credentials-provider users; Google OAuth users have no local password)
+**Frontend** (`frontend/`):
+- Next.js (App Router), React, TypeScript
+- Tailwind CSS
+- Redux Toolkit + Axios (calls the NestJS backend's REST API, cross-origin, with credentials)
+- React Hook Form + Zod (client-side form validation only)
+
+**Backend** (`backend/`):
+- NestJS + TypeScript (REST controllers/services/modules)
+- PostgreSQL (local instance) + TypeORM (entities, migrations, repository pattern via `@nestjs/typeorm`)
+- Auth: `@nestjs/passport` + `passport-local` (credentials) + `passport-google-oauth20` (Google OAuth) + `@nestjs/jwt` (access/refresh tokens as httpOnly cookies)
+- Validation: `class-validator` + `class-transformer` DTOs (NestJS idiomatic; Zod is not used backend-side)
+- Password hashing: bcrypt
 
 ---
 
 ## 2. Repository & Project Structure
 
-**Single GitHub repository, single Next.js project** — no separate frontend/backend apps or folders:
+**Single GitHub repository**, two independent Node projects as sibling folders:
 
 ```
-hrms-app/                          # single Next.js app, single git repo
-├── src/
-│   ├── app/
-│   │   ├── (auth)/
-│   │   │   ├── login/page.tsx
-│   │   │   ├── signup/page.tsx
-│   │   │   ├── forgot-password/page.tsx
-│   │   │   └── reset-password/[token]/page.tsx
-│   │   ├── (dashboard)/
-│   │   │   ├── admin/...
-│   │   │   ├── supervisor/...
-│   │   │   └── employee/...
-│   │   └── api/                     # Route Handlers = "backend"
-│   │       ├── auth/
-│   │       │   ├── [...nextauth]/route.ts     # NextAuth handler (session, Google OAuth, credentials)
-│   │       │   ├── signup/route.ts
-│   │       │   ├── forgot-password/route.ts
-│   │       │   └── reset-password/[token]/route.ts
-│   │       ├── employees/route.ts, [id]/route.ts
-│   │       ├── departments/route.ts, [id]/route.ts
-│   │       ├── attendance/check-in/route.ts, check-out/route.ts, me/route.ts, team/route.ts
-│   │       ├── leave/policies/route.ts, requests/route.ts, requests/[id]/route.ts, balance/me/route.ts
-│   │       ├── notifications/route.ts, [id]/read/route.ts
-│   │       ├── reviews/cycles/route.ts, [id]/route.ts
-│   │       ├── dashboard/admin/route.ts, supervisor/route.ts, employee/route.ts
-│   │       └── uploads/[...path]/route.ts        # serves local uploaded files
-│   ├── components/                    # shared UI components
-│   ├── features/                      # Redux slices, grouped by domain
-│   ├── lib/
-│   │   ├── db/                          # TypeORM data-source, entities, migrations
-│   │   │   ├── data-source.ts
-│   │   │   ├── entities/
-│   │   │   └── migrations/
-│   │   ├── auth/                        # NextAuth config (authOptions), password hashing helpers
-│   │   ├── validation/                  # Zod schemas, shared client+server
-│   │   ├── axios.ts                     # Axios instance (baseURL relative, withCredentials true)
-│   │   └── utils/
-│   ├── store/                          # Redux store config
-│   ├── types/
-│   └── middleware.ts                   # role-based route protection (reads NextAuth session/JWT)
-├── uploads/                            # local file storage, gitignored (server-only, outside public/ for access control)
-├── .env.local                          # DATABASE_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, etc.
-├── .env.example
-├── tailwind.config.ts
-├── next.config.ts
-└── package.json
+hrms-app/                              # single git repo
+├── frontend/                          # Next.js app (UI only)
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (auth)/login|signup|forgot-password|reset-password/[token]/
+│   │   │   └── (dashboard)/admin|supervisor|employee/...
+│   │   ├── components/
+│   │   ├── features/                  # Redux slices per domain
+│   │   ├── lib/
+│   │   │   ├── api.ts                   # Axios instance, baseURL = NEXT_PUBLIC_API_URL, withCredentials true
+│   │   │   └── validation/              # Zod schemas (frontend-only, form validation)
+│   │   ├── store/
+│   │   ├── types/
+│   │   └── middleware.ts               # reads auth cookie/role (via a lightweight call to backend or a decoded JWT) to gate routes
+│   ├── .env.local                      # NEXT_PUBLIC_API_URL=http://localhost:4000
+│   ├── tailwind.config.ts
+│   ├── next.config.ts
+│   └── package.json
+│
+└── backend/                           # NestJS app (all REST APIs)
+    ├── src/
+    │   ├── main.ts                      # bootstraps Nest app, enables CORS for frontend origin + credentials
+    │   ├── app.module.ts
+    │   ├── config/                       # env validation/config module
+    │   ├── database/
+    │   │   ├── data-source.ts             # TypeORM data source (for CLI migrations)
+    │   │   ├── entities/                  # User, Employee, Department, LeaveRequest, etc.
+    │   │   └── migrations/
+    │   ├── auth/
+    │   │   ├── auth.module.ts, auth.controller.ts, auth.service.ts
+    │   │   ├── strategies/                # local.strategy.ts, google.strategy.ts, jwt.strategy.ts
+    │   │   └── guards/                    # jwt-auth.guard.ts, roles.guard.ts + roles.decorator.ts
+    │   ├── users/                          # user/employee-adjacent shared logic
+    │   ├── employees/
+    │   ├── departments/
+    │   ├── attendance/
+    │   ├── leave/
+    │   ├── notifications/
+    │   ├── reviews/
+    │   ├── dashboard/
+    │   └── health/                        # GET /health — DB connectivity check
+    ├── uploads/                            # local file storage, gitignored
+    ├── .env
+    ├── .env.example
+    └── package.json
 ```
 
 Notes:
-- Route Handlers under `src/app/api/**` are the entire "backend" — no separate server process, no separate `package.json`.
-- `src/lib/db` holds TypeORM setup; Route Handlers import a shared, singleton data-source (important in Next.js dev mode to avoid re-creating connections on hot reload).
-- Uploaded files are kept outside `public/` and served through a Route Handler so access can be gated by session/role later if needed (e.g., private documents); profile photos that are safe to be public can instead go in `public/uploads/` for simplicity — decide per-file-type at Milestone 6.
+- Each project runs as its own `npm run dev`/`start:dev` process on its own port (Next.js on 3000, NestJS on 4000 by convention) — no shared `node_modules`, no npm workspace, matching the user's preference for two genuinely independent projects.
+- `backend/uploads/` replaces the earlier `frontend`-adjacent uploads idea — file storage now lives entirely on the backend, since that's the only process with a writable, long-lived local disk role.
+- CORS must be explicitly enabled in NestJS (`app.enableCors({ origin: FRONTEND_URL, credentials: true })`) since frontend and backend are different origins in dev (`localhost:3000` vs `localhost:4000`).
 
 ---
 
-## 3. Database Foundation (PostgreSQL + TypeORM) — unchanged from original plan
+## 3. Database Foundation (PostgreSQL + TypeORM) — entity design unchanged, now lives in `backend/`
 
-Same entity set as before, unaffected by the Express removal (TypeORM entities/migrations are framework-agnostic):
+Same entity set as before (entity design is framework-agnostic, so nothing about the schema changes, only which project hosts it):
 
 `User`, `PasswordResetToken`, `Department`, `Employee`, `LeavePolicy`, `LeaveBalance`, `LeaveRequest`, `AttendanceRecord`, `PerformanceReviewCycle`, `PerformanceReview`, `Notification`.
 
-- Connects to the **local PostgreSQL instance** via a `DATABASE_URL` (or discrete `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`) environment variable in `.env.local`. No Docker, no containerized Postgres.
-- TypeORM migrations (not `synchronize: true`) from day one, run via an npm script (`npm run typeorm -- migration:run`) against the local instance.
-- Tables are still created incrementally per milestone (migration per feature), same as the original plan.
+- Connects to the existing local PostgreSQL instance (`hrms_dev` database, already created) via `backend/.env` (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`) — same credentials already in use, no Docker.
+- TypeORM migrations (not `synchronize: true`), run from within `backend/` via its own npm scripts.
+- `@nestjs/typeorm`'s `TypeOrmModule.forRootAsync` wires the same entities into Nest's DI system for use in services/repositories.
 
 ---
 
-## 4. Feature Roadmap & Git Checkpoints (updated for Next.js-only architecture)
+## 4. Restructuring Steps (one-time, before resuming the milestone roadmap)
 
-Same order and verification discipline as the original plan; implementation details updated to Route Handlers + NextAuth.
+Since Milestone 0 was already built and committed as a single Next.js app, this restructuring must happen before Milestone 1 can proceed:
 
-### Milestone 0 — Project Setup
-- `create-next-app` (TypeScript, Tailwind, App Router, ESLint) as the single project
-- Install TypeORM + `pg`, Redux Toolkit, Axios, NextAuth, Zod, React Hook Form, bcrypt
-- Set up `src/lib/db/data-source.ts` (singleton pattern for Next.js hot-reload), `.env.local`/`.env.example` with local Postgres connection vars
-- Health-check Route Handler: `GET /api/health` (verifies DB connectivity)
-- Redux store shell, Axios instance, base layout, Tailwind config
-- Single git repo init, `.gitignore` (node_modules, .env*, uploads/, .next/)
-- **Checkpoint**: `chore: initial Next.js project scaffolding with TypeORM and Redux`
-- **Verify**: `npm run dev` starts the app; `/api/health` returns DB-connected status; default page renders with Tailwind styles applied.
+1. Move the existing Next.js project (currently at repo root) into `frontend/`.
+2. From `frontend/`, remove backend-only pieces: `src/app/api/**` (the health route), `src/lib/db/**` (TypeORM data-source/entities/migrations), and the now-unnecessary backend dependencies (`typeorm`, `pg`, `next-auth`, `bcryptjs`, `ts-node`, `dotenv-cli`, `reflect-metadata`) from its `package.json`. Keep Redux Toolkit, Axios, React Hook Form, Zod, Tailwind.
+3. Scaffold a new NestJS project at `backend/` (via Nest CLI), add `@nestjs/typeorm`, `typeorm`, `pg`, `@nestjs/passport`, `passport`, `passport-local`, `passport-google-oauth20`, `@nestjs/jwt`, `bcrypt`, `class-validator`, `class-transformer`.
+4. Recreate the TypeORM data-source and entities directory inside `backend/src/database/`, reusing the exact schema design from the original plan (no entities existed yet beyond folder scaffolding, so this is a clean move).
+5. Recreate the DB health check as a NestJS `HealthController` (`GET /health`) that runs a trivial query through the injected `DataSource`.
+6. Update root `.gitignore` to cover both `frontend/node_modules`, `backend/node_modules`, `backend/uploads/`, both `.env*` sets, etc.
+7. Verify both projects independently: `cd frontend && npm run dev` serves the UI on 3000; `cd backend && npm run start:dev` serves `/health` on 4000 with a working DB connection; a fetch from the frontend to `http://localhost:4000/health` succeeds (confirms CORS is configured correctly).
+8. **Checkpoint** (left for the user to commit, per their stated preference): `refactor: split into frontend (Next.js) and backend (NestJS) projects`.
+
+---
+
+## 5. Feature Roadmap & Git Checkpoints (updated for Next.js + NestJS split)
+
+Same order as before; each milestone now typically touches both projects (a NestJS module + controller on the backend, pages/Redux slice on the frontend).
 
 ### Milestone 1 — Database Foundation
-- First TypeORM migration for `User` + `PasswordResetToken` against the local Postgres DB
-- Verify migration run/revert
-- **Checkpoint**: `feat(db): set up TypeORM and initial user schema/migration`
-- **Verify**: migration creates tables in local `psql`; revert cleanly drops them.
+- Backend: first TypeORM migration for `User` + `PasswordResetToken`
+- **Verify**: migration run/revert against local Postgres via `backend`'s TypeORM CLI script.
 
 ### Milestone 2 — Authentication: Signup, Login, Logout
-- NextAuth config (`src/lib/auth/authOptions.ts`) with Credentials provider (bcrypt compare against `User.passwordHash`, TypeORM lookup), JWT session strategy
-- Route Handlers: `POST /api/signup` (Zod validation, bcrypt hash, create `User`), NextAuth's built-in `/api/auth/[...nextauth]` handles login/logout/session
-- Frontend: signup/login pages using React Hook Form + Zod resolver, NextAuth's `signIn()`/`signOut()`/`useSession()`, Redux `authSlice` synced from session where needed, `middleware.ts` for protected-route redirects based on session
-- **Checkpoint**: `feat(auth): signup, login, logout via NextAuth credentials provider`
-- **Verify**: signup → login → access protected page → refresh page (session persists) → logout → redirected from protected page. Test invalid credentials and duplicate signup.
+- Backend: `AuthModule` — `POST /auth/signup` (DTO validation, bcrypt hash), `POST /auth/login` (Passport local strategy, bcrypt compare, issues JWT access+refresh as httpOnly cookies), `POST /auth/logout`, `POST /auth/refresh`, `GET /auth/me` (guarded by `JwtAuthGuard`)
+- Frontend: signup/login pages (React Hook Form + Zod), Axios calls to backend with `withCredentials: true`, Redux `authSlice`, Axios response interceptor for 401 → refresh → retry, `middleware.ts` for protected routes
+- **Verify**: full signup → login → protected page → refresh persists session → logout flow across both apps; invalid credentials and duplicate signup rejected.
 
 ### Milestone 3 — Forgot / Reset Password
-- Route Handlers: `POST /api/forgot-password` (generate + hash token, store with expiry, send email via dev SMTP catcher e.g. Ethereal), `POST /api/reset-password/[token]` (validate token/expiry, update password hash, invalidate token)
-- Frontend: forgot-password and reset-password/[token] pages
-- **Checkpoint**: `feat(auth): forgot and reset password flow`
-- **Verify**: request reset → dev email link → set new password → log in with new password; expired/invalid token rejected.
+- Backend: `POST /auth/forgot-password`, `POST /auth/reset-password/:token` (hashed token + expiry, dev SMTP email)
+- Frontend: forgot/reset password pages
+- **Verify**: as original plan.
 
 ### Milestone 4 — Google OAuth
-- Add Google provider to NextAuth config (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` in `.env.local`); NextAuth's `signIn`/callback link Google identity to `User` by email or `googleId`, defaulting role to `employee` on first login
-- Frontend: "Sign in with Google" button using NextAuth's `signIn('google')`
-- **Checkpoint**: `feat(auth): google oauth via nextauth`
-- **Verify**: Google sign-in creates a new user on first login and logs in an existing user (matched by email) on subsequent logins.
+- Backend: `GoogleStrategy` via `passport-google-oauth20`, `GET /auth/google`, `GET /auth/google/callback` — find-or-create `User`, issue same JWT cookies, redirect back to the frontend URL
+- Frontend: "Sign in with Google" button linking to the backend's `/auth/google`
+- **Verify**: new-user creation and existing-user login both work through the full redirect round trip.
 
 ### Milestone 5 — Roles & Permissions (RBAC)
-- Store `role` in the NextAuth JWT/session via callbacks (`jwt`, `session`)
-- `middleware.ts` protects `(dashboard)/admin`, `/supervisor`, `/employee` segments by role; Route Handlers re-check role server-side from the session (never trust client-only checks)
-- Seed script (a one-off TypeORM script) creates one admin, one supervisor, one employee for manual testing
-- **Checkpoint**: `feat(rbac): role-based route and API protection`
-- **Verify**: log in as each seeded role; correct dashboard shown; cross-role pages/API calls return 403/redirect.
+- Backend: `role` embedded in JWT payload; `RolesGuard` + `@Roles()` decorator protect controllers/handlers
+- Frontend: role-aware layout/nav, `middleware.ts` route guards per role segment
+- Seed script (NestJS CLI command or a one-off script using the TypeORM data source) creates admin/supervisor/employee test users
+- **Verify**: as original plan — correct dashboard per role, cross-role access blocked both at the API (403) and in the UI.
 
-### Milestone 6 — Employee Management (Admin/HR)
-- Migration for `Department`, `Employee`
-- Route Handlers: CRUD for departments and employees (create employee = create `User` + `Employee` together), list with pagination/search/filter, profile photo upload (handled via a Route Handler reading `multipart/form-data`, written to local `uploads/`)
-- Frontend: admin employee list/detail/create/edit, department management, supervisor read-only team view, employee self-profile view/edit
-- **Checkpoint**: `feat(employees): department and employee CRUD with profile management`
-- **Verify**: same as original plan — create/edit/search/filter as admin, restricted views for employee/supervisor, uploaded photo renders correctly.
-
-### Milestone 7 — Attendance
-- Migration for `AttendanceRecord`
-- Route Handlers: check-in/check-out, self/team/all history with filters, admin correction
-- Frontend: check-in/out widget, personal history, team view, admin report view
-- **Checkpoint**: `feat(attendance): check-in/out and attendance views per role`
-- **Verify**: as original plan.
-
-### Milestone 8 — Leave Management
-- Migration for `LeavePolicy`, `LeaveBalance`, `LeaveRequest`
-- Route Handlers: policy CRUD, balance allocation, apply/approve/reject, auto-deduct balance, sync `AttendanceRecord` to `on-leave` on approval
-- Frontend: application form + balance + history, supervisor approval queue, admin policy management
-- **Checkpoint**: `feat(leave): leave policies, balances, requests, and approval workflow`
-- **Verify**: as original plan.
-
-### Milestone 9 — Notifications
-- Migration for `Notification`
-- Route Handlers emit notifications on leave events; `GET /api/notifications`, mark-as-read
-- Frontend: notification bell with polling
-- **Checkpoint**: `feat(notifications): in-app notifications for leave events`
-- **Verify**: as original plan.
-
-### Milestone 10 — Performance Reviews
-- Migration for `PerformanceReviewCycle`, `PerformanceReview`
-- Route Handlers: cycle management, self/manager review submission, status transitions
-- Frontend: cycle admin UI, self-review form, manager review form, combined view
-- **Checkpoint**: `feat(performance): review cycles and self/manager review workflow`
-- **Verify**: as original plan.
-
-### Milestone 11 — Dashboards
-- Route Handlers: per-role aggregate endpoints
-- Frontend: role-specific dashboard widgets
-- **Checkpoint**: `feat(dashboard): role-specific summary dashboards`
-- **Verify**: as original plan.
-
-### Milestone 12 — Global Search / Filtering & Reports
-- Route Handlers: employee search, CSV export for leave/attendance reports
-- Frontend: search bar, report filters + CSV download
-- **Checkpoint**: `feat(reports): global search and CSV report export`
-- **Verify**: as original plan.
-
-### Milestone 13 — Settings
-- Org settings (working days, holiday calendar), user settings (change password, notification preferences)
-- **Checkpoint**: `feat(settings): org and user-level settings`
-- **Verify**: as original plan.
+### Milestones 6–13 — Employee Management → Attendance → Leave → Notifications → Performance Reviews → Dashboards → Reports/Settings
+Unchanged in scope and order from the original plan; each becomes a NestJS module (controller + service + entity/migration) paired with its Next.js pages/Redux slice. Verification steps per milestone are the same end-to-end manual checks as before (create/edit/search/filter, approval workflows, cross-role visibility, etc.) — see the prior plan revision for the full per-milestone detail, which still applies feature-by-feature, just re-homed onto NestJS controllers instead of Route Handlers.
 
 ---
 
-## 5. Frontend Redux Structure — unchanged
+## 6. Frontend Redux Structure — unchanged
 
-One slice per domain under `src/features/<domain>/<domain>Slice.ts`: `employees`, `departments`, `attendance`, `leave`, `notifications`, `reviews`, `dashboard`. `auth` state is largely driven by NextAuth's `useSession()`; a thin `authSlice` may still exist for UI-only auth state (e.g., form status) rather than duplicating session data.
-
-RTK Query vs. thunks+Axios decision still made concretely at Milestone 2, when the first slice pattern is established.
+One slice per domain: `auth`, `employees`, `departments`, `attendance`, `leave`, `notifications`, `reviews`, `dashboard`. Axios instance now points cross-origin at the NestJS backend instead of same-origin Route Handlers.
 
 ---
 
-## 6. Authentication/OAuth Flow Summary (NextAuth-based)
+## 7. Authentication/OAuth Flow Summary (NestJS-owned)
 
-1. Credentials login: `signIn('credentials', {...})` → NextAuth's authorize callback looks up `User` via TypeORM, compares bcrypt hash → on success, NextAuth issues its JWT session cookie (httpOnly).
-2. Google login: `signIn('google')` → OAuth redirect/consent → NextAuth's Google provider callback finds-or-creates the `User` by email/`googleId` → same JWT session cookie issued.
-3. `role` is embedded into the token via NextAuth's `jwt` callback and exposed on the client via the `session` callback; Route Handlers re-derive the session server-side (`getServerSession`/`auth()`) and re-check role before performing any mutation — client-side role checks are UX-only.
-4. `middleware.ts` uses NextAuth's session/JWT to gate access to role-specific route segments at the edge, before the page even renders.
-5. Axios instance in `src/lib/axios.ts` calls same-origin `/api/*` routes with credentials included automatically (same-origin cookies) — no manual token attachment needed, since NextAuth manages the session cookie.
-
----
-
-## 7. Testing Approach — unchanged
-
-Manual, end-to-end testing per milestone: exercise Route Handlers directly (Postman/Thunder Client/`.http` file) before wiring the frontend, then full browser walkthroughs per each milestone's "Verify" step. No automated test framework for now.
+1. Credentials login: frontend posts to `POST {backend}/auth/login` → Nest's local strategy validates via bcrypt against the TypeORM `User` repository → on success, Nest sets JWT access (~15 min) + refresh (~7 days) tokens as httpOnly, `SameSite=Lax` cookies on its own response (requires `credentials: true` CORS and the frontend's Axios using `withCredentials: true`).
+2. Google login: frontend links to `GET {backend}/auth/google` → Google consent → Nest's Google strategy callback finds-or-creates the `User` by email/`googleId` → issues the same JWT cookies → redirects back to the frontend.
+3. `role` is embedded in the JWT payload; a `RolesGuard` re-validates it server-side on every protected NestJS route — the frontend's role-based UI/middleware checks are UX-only.
+4. Token refresh: Axios interceptor on 401 calls `POST {backend}/auth/refresh` (reads the refresh cookie), then retries the original request.
 
 ---
 
-## 8. Immediate Next Steps
+## 8. Testing Approach — unchanged
 
-1. Confirm local PostgreSQL connection details (host/port/user/db name) to populate `.env.example` accurately.
-2. Confirm Google OAuth app credentials are available (or will be created) for Milestone 4 — not needed until then.
-3. Begin Milestone 0 (single Next.js app scaffolding) once this plan is approved.
+Manual, end-to-end per milestone: exercise NestJS endpoints via Postman/Thunder Client first, then full browser walkthroughs against both running dev servers.
+
+---
+
+## 9. Immediate Next Steps
+
+1. Execute the one-time restructuring (Section 4) to split the existing single Next.js app into `frontend/` + a new `backend/` NestJS project.
+2. Verify both dev servers run independently and the frontend can reach the backend's `/health` endpoint (CORS working).
+3. Resume the milestone roadmap at Milestone 1 (Database Foundation) inside `backend/`.
