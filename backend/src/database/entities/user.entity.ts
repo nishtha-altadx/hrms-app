@@ -32,9 +32,6 @@ export class User {
   @Column({ name: "google_id", type: "varchar", unique: true, nullable: true })
   googleId: string | null;
 
-  @Column({ name: "refresh_token_hash", type: "varchar", nullable: true })
-  refreshTokenHash: string | null;
-
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 
