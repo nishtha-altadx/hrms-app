@@ -1,7 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { isAxiosError } from "axios";
-import { api } from "@/lib/api";
-import type { LoginFormValues, SignupFormValues } from "@/lib/validation/auth";
+import { backendClient } from "@/lib/backendClient";
+import { clearToken, setToken } from "@/lib/tokenStorage";
+import type { LoginFormValues, SignupFormValues } from "@/lib/schemas/auth";
 
 export interface AuthUser {
   id: string;
@@ -35,7 +36,7 @@ export const signup = createAsyncThunk(
   "auth/signup",
   async (data: SignupFormValues, { rejectWithValue }) => {
     try {
-      const res = await api.post<AuthUser>("/auth/signup", data);
+      const res = await backendClient.post<AuthUser>("/auth/signup", data);
       return res.data;
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error, "Signup failed"));
@@ -47,7 +48,8 @@ export const login = createAsyncThunk(
   "auth/login",
   async (data: LoginFormValues, { rejectWithValue }) => {
     try {
-      const res = await api.post<{ user: AuthUser }>("/auth/login", data);
+      const res = await backendClient.post<{ user: AuthUser; token: string }>("/auth/login", data);
+      setToken(res.data.token);
       return res.data.user;
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error, "Invalid email or password"));
@@ -55,23 +57,28 @@ export const login = createAsyncThunk(
   },
 );
 
-export const fetchMe = createAsyncThunk("auth/fetchMe", async (_: void, { rejectWithValue }) => {
-  try {
-    const res = await api.get<{ user: AuthUser }>("/auth/me");
-    return res.data.user;
-  } catch (error) {
-    return rejectWithValue(extractErrorMessage(error, "Not authenticated"));
-  }
-});
-
-export const logout = createAsyncThunk("auth/logout", async () => {
-  await api.post("/auth/logout");
-});
+export const fetchProfile = createAsyncThunk(
+  "auth/fetchProfile",
+  async (_: void, { rejectWithValue }) => {
+    try {
+      const res = await backendClient.get<{ user: AuthUser }>("/profile");
+      return res.data.user;
+    } catch (error) {
+      return rejectWithValue(extractErrorMessage(error, "Not authenticated"));
+    }
+  },
+);
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
-  reducers: {},
+  reducers: {
+    loggedOut: (state) => {
+      clearToken();
+      state.status = "unauthenticated";
+      state.user = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(login.pending, (state) => {
@@ -88,18 +95,14 @@ const authSlice = createSlice({
         state.user = null;
         state.error = action.payload as string;
       })
-      .addCase(fetchMe.pending, (state) => {
+      .addCase(fetchProfile.pending, (state) => {
         state.status = "loading";
       })
-      .addCase(fetchMe.fulfilled, (state, action) => {
+      .addCase(fetchProfile.fulfilled, (state, action) => {
         state.status = "authenticated";
         state.user = action.payload;
       })
-      .addCase(fetchMe.rejected, (state) => {
-        state.status = "unauthenticated";
-        state.user = null;
-      })
-      .addCase(logout.fulfilled, (state) => {
+      .addCase(fetchProfile.rejected, (state) => {
         state.status = "unauthenticated";
         state.user = null;
       })
@@ -118,4 +121,5 @@ const authSlice = createSlice({
   },
 });
 
+export const { loggedOut } = authSlice.actions;
 export default authSlice.reducer;

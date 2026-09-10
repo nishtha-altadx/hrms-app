@@ -2,19 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchMe } from "@/features/auth/authSlice";
+import { useAuth } from "@/hooks/useAuth";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const dispatch = useAppDispatch();
   const router = useRouter();
-  const { status } = useAppSelector((state) => state.auth);
+  const { status, fetchProfile } = useAuth();
 
   useEffect(() => {
     if (status === "idle") {
-      dispatch(fetchMe());
+      fetchProfile();
     }
-  }, [status, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   useEffect(() => {
     if (status === "unauthenticated") {

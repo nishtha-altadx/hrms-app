@@ -14,6 +14,14 @@ interface RequestWithUser extends Request {
   user: ReturnType<typeof sanitizeUser>;
 }
 
+function extractBearerToken(request: Request): string | null {
+  const header = request.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    return null;
+  }
+  return header.slice("Bearer ".length);
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
@@ -23,10 +31,10 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
-    const token = request.cookies?.token;
+    const token = extractBearerToken(request);
 
     if (!token) {
-      throw new UnauthorizedException("Not logged in");
+      throw new UnauthorizedException("No token provided");
     }
 
     let payload: JwtPayload;
