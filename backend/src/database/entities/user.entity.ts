@@ -12,6 +12,12 @@ export enum UserRole {
   EMPLOYEE = "employee",
 }
 
+export enum Gender {
+  MALE = "male",
+  FEMALE = "female",
+  OTHER = "other",
+}
+
 @Entity({ name: "users" })
 export class User {
   @PrimaryGeneratedColumn("uuid")
@@ -29,8 +35,20 @@ export class User {
   @Column({ name: "is_active", type: "boolean", default: true })
   isActive: boolean;
 
-  @Column({ name: "google_id", type: "varchar", unique: true, nullable: true })
-  googleId: string | null;
+  @Column({ name: "first_name", type: "varchar", nullable: true })
+  firstName: string | null;
+
+  @Column({ name: "last_name", type: "varchar", nullable: true })
+  lastName: string | null;
+
+  @Column({ name: "phone", type: "varchar", nullable: true })
+  phone: string | null;
+
+  @Column({ name: "date_of_birth", type: "date", nullable: true })
+  dateOfBirth: string | null;
+
+  @Column({ type: "enum", enum: Gender, nullable: true })
+  gender: Gender | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;

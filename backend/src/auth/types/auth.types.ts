@@ -6,7 +6,18 @@ export interface JwtPayload {
   role: UserRole;
 }
 
-export type SafeUser = Pick<User, "id" | "email" | "role" | "isActive">;
+export type SafeUser = Pick<
+  User,
+  | "id"
+  | "email"
+  | "role"
+  | "isActive"
+  | "firstName"
+  | "lastName"
+  | "phone"
+  | "dateOfBirth"
+  | "gender"
+>;
 
 export function sanitizeUser(user: User): SafeUser {
   return {
@@ -14,5 +25,10 @@ export function sanitizeUser(user: User): SafeUser {
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    dateOfBirth: user.dateOfBirth,
+    gender: user.gender,
   };
 }

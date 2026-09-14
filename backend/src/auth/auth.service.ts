@@ -22,7 +22,15 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, PASSWORD_SALT_ROUNDS);
-    const user = await this.usersService.createUser({ email: dto.email, passwordHash });
+    const user = await this.usersService.createUser({
+      email: dto.email,
+      passwordHash,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phone: dto.phone,
+      dateOfBirth: dto.dateOfBirth,
+      gender: dto.gender,
+    });
     return sanitizeUser(user);
   }
 
