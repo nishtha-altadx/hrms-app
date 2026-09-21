@@ -9,6 +9,11 @@ export interface AuthUser {
   email: string;
   role: "admin" | "supervisor" | "employee";
   isActive: boolean;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  dateOfBirth: string | null;
+  gender: "male" | "female" | "other" | null;
 }
 
 interface AuthState {
@@ -34,10 +39,20 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 
 export const signup = createAsyncThunk(
   "auth/signup",
-  async (data: SignupFormValues, { rejectWithValue }) => {
+  async (data: SignupFormValues, { dispatch, rejectWithValue }) => {
     try {
-      const res = await backendClient.post<AuthUser>("/auth/signup", data);
-      return res.data;
+      const res = await backendClient.post<{
+        accessToken: string;
+        user: { id: string; email: string };
+      }>("/auth/signup", data);
+      setToken(res.data.accessToken);
+
+      // Signup only returns { id, email } — fetch the full profile to hydrate real app state.
+      const profileResult = await dispatch(fetchProfile());
+      if (fetchProfile.fulfilled.match(profileResult)) {
+        return profileResult.payload;
+      }
+      return rejectWithValue("Signed up, but failed to load your profile");
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error, "Signup failed"));
     }
@@ -110,12 +125,14 @@ const authSlice = createSlice({
         state.status = "loading";
         state.error = null;
       })
-      .addCase(signup.fulfilled, (state) => {
-        state.status = "unauthenticated";
+      .addCase(signup.fulfilled, (state, action) => {
+        state.status = "authenticated";
+        state.user = action.payload;
         state.error = null;
       })
       .addCase(signup.rejected, (state, action) => {
         state.status = "unauthenticated";
+        state.user = null;
         state.error = action.payload as string;
       });
   },

@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { LogIn, Mail } from "lucide-react";
 import { loginSchema, LoginFormValues } from "@/lib/schemas/auth";
 import { login } from "@/features/auth/authSlice";
 import { useAuth } from "@/hooks/useAuth";
+import { TextField } from "@/components/ui/TextField";
+import { PasswordField } from "@/components/ui/PasswordField";
 
 export function LoginForm() {
   const { login: dispatchLogin } = useAuth();
@@ -31,40 +34,39 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-      <div>
-        <label className="block text-sm font-medium">Email</label>
-        <input
-          type="email"
-          className="w-full rounded border px-3 py-2"
-          {...register("email")}
-        />
-        {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <TextField
+        label="Email"
+        icon={Mail}
+        type="email"
+        placeholder="you@example.com"
+        error={errors.email?.message}
+        {...register("email")}
+      />
 
-      <div>
-        <label className="block text-sm font-medium">Password</label>
-        <input
-          type="password"
-          className="w-full rounded border px-3 py-2"
-          {...register("password")}
-        />
-        {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
-      </div>
+      <PasswordField
+        label="Password"
+        placeholder="Enter your password"
+        error={errors.password?.message}
+        {...register("password")}
+      />
 
-      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      {serverError && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{serverError}</p>
+      )}
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50"
       >
+        <LogIn className="h-4 w-4" />
         {isSubmitting ? "Logging in..." : "Log in"}
       </button>
 
-      <p className="text-sm text-zinc-500">
+      <p className="text-center text-sm text-slate-500">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="underline">
+        <Link href="/signup" className="font-medium text-indigo-600 hover:underline">
           Sign up
         </Link>
       </p>

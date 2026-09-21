@@ -15,7 +15,7 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async signup(dto: SignupDto): Promise<SafeUser> {
+  async signup(dto: SignupDto): Promise<{ accessToken: string; user: { id: string; email: string } }> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException("Email is already registered");
@@ -31,7 +31,14 @@ export class AuthService {
       dateOfBirth: dto.dateOfBirth,
       gender: dto.gender,
     });
-    return sanitizeUser(user);
+
+    const safeUser = sanitizeUser(user);
+    const accessToken = this.issueAccessToken(safeUser);
+
+    return {
+      accessToken,
+      user: { id: safeUser.id, email: safeUser.email },
+    };
   }
 
   async validateUser(email: string, password: string): Promise<SafeUser | null> {
