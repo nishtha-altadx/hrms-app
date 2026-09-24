@@ -1,5 +1,5 @@
 import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
-import { Gender } from "../../database/entities/user.entity.js";
+import { Gender } from "../../../database/entities/user.entity.js";
 
 export class SignupDto {
   @IsEmail()

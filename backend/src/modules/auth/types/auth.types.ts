@@ -1,4 +1,4 @@
-import { User, UserRole } from "../../database/entities/user.entity.js";
+import { User, UserRole } from "../../../database/entities/user.entity.js";
 
 export interface JwtPayload {
   sub: string;
