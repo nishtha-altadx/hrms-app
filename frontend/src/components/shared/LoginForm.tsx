@@ -44,12 +44,20 @@ export function LoginForm() {
         {...register("email")}
       />
 
-      <PasswordField
-        label="Password"
-        placeholder="Enter your password"
-        error={errors.password?.message}
-        {...register("password")}
-      />
+      <div className="flex flex-col gap-1">
+        <PasswordField
+          label="Password"
+          placeholder="Enter your password"
+          error={errors.password?.message}
+          {...register("password")}
+        />
+        <Link
+          href="/forgot-password"
+          className="self-end text-xs font-medium text-indigo-600 hover:underline"
+        >
+          Forgot password?
+        </Link>
+      </div>
 
       {serverError && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{serverError}</p>
