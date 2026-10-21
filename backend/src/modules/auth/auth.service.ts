@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { MailService } from "../mail/mail.service.js";
 import { UsersService } from "../users/users.service.js";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto.js";
 import { ResetPasswordDto } from "./dto/reset-password.dto.js";
@@ -22,10 +23,13 @@ const RESET_TOKEN_ERROR_MESSAGES: Record<ResetTokenIneligibleReason, string> = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly passwordResetTokensService: PasswordResetTokensService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async signup(dto: SignupDto): Promise<{ accessToken: string; user: { id: string; email: string } }> {
@@ -90,8 +94,13 @@ export class AuthService {
     const frontendUrl = this.configService.get<string>("FRONTEND_URL", "http://localhost:3000");
     const resetLink = `${frontendUrl}/reset-password/${rawToken}`;
 
-    // Dev-only: log the link instead of sending a real email.
-    console.log(`Password reset link for ${user.email}: ${resetLink}`);
+    this.mailService.sendPasswordResetEmail(user.email, resetLink).catch((error: unknown) => {
+      this.logger.error(`Failed to send password reset email: ${String(error)}`);
+    });
+
+    if (this.configService.get<string>("NODE_ENV") !== "production") {
+      this.logger.debug(`Password reset link for ${user.email}: ${resetLink}`);
+    }
 
     return genericResponse;
   }
