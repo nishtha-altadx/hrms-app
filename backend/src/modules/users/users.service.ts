@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Gender, User } from "../../database/entities/user.entity.js";
+import { UpdateProfileDto } from "./dto/update-profile.dto.js";
 
 @Injectable()
 export class UsersService {
@@ -32,5 +33,25 @@ export class UsersService {
 
   async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
     await this.usersRepository.update(id, { passwordHash });
+  }
+
+  async updateProfile(id: string, dto: UpdateProfileDto): Promise<User> {
+    if (dto.dateOfBirth && new Date(dto.dateOfBirth) > new Date()) {
+      throw new BadRequestException("Date of birth cannot be in the future");
+    }
+
+    const { firstName, lastName, phone, dateOfBirth, gender } = dto;
+    const changes = { firstName, lastName, phone, dateOfBirth, gender };
+    const defined = Object.fromEntries(
+      Object.entries(changes).filter(([, value]) => value !== undefined),
+    );
+
+    if (Object.keys(defined).length > 0) {
+      await this.usersRepository.update(id, defined);
+    }
+
+    const user = await this.findById(id);
+    if (!user) throw new NotFoundException("User not found");
+    return user;
   }
 }

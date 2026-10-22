@@ -84,6 +84,24 @@ export const fetchProfile = createAsyncThunk(
   },
 );
 
+export type ProfileUpdate = Partial<
+  Pick<AuthUser, "firstName" | "lastName" | "phone" | "dateOfBirth" | "gender">
+>;
+
+// No status change on pending: RequireAuth shows a full-page spinner for any
+// status other than "authenticated", which would unmount the edit form.
+export const updateProfile = createAsyncThunk(
+  "auth/updateProfile",
+  async (data: ProfileUpdate, { rejectWithValue }) => {
+    try {
+      const res = await backendClient.patch<{ user: AuthUser }>("/profile", data);
+      return res.data.user;
+    } catch (error) {
+      return rejectWithValue(extractErrorMessage(error, "Failed to update profile"));
+    }
+  },
+);
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
@@ -120,6 +138,9 @@ const authSlice = createSlice({
       .addCase(fetchProfile.rejected, (state) => {
         state.status = "unauthenticated";
         state.user = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.user = action.payload;
       })
       .addCase(signup.pending, (state) => {
         state.status = "loading";

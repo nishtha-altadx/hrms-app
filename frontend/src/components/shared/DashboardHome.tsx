@@ -1,18 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  Calendar,
-  LayoutDashboard,
-  LogOut,
-  Mail,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  VenetianMask,
-} from "lucide-react";
+import { LayoutDashboard, LogOut, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { BrandMark } from "@/components/shared/BrandMark";
+import { EditProfileForm } from "@/components/shared/EditProfileForm";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -92,61 +84,7 @@ export function DashboardHome() {
           </header>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <section className="rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/50 lg:col-span-2">
-              <h2 className="text-base font-semibold text-slate-900">Profile details</h2>
-
-              <dl className="mt-4 flex flex-col divide-y divide-slate-100">
-                <div className="flex items-center justify-between gap-4 py-3">
-                  <dt className="flex items-center gap-2.5 text-sm text-slate-500">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                    Email
-                  </dt>
-                  <dd className="text-sm font-medium text-slate-900">{user?.email}</dd>
-                </div>
-
-                {user?.phone && (
-                  <div className="flex items-center justify-between gap-4 py-3">
-                    <dt className="flex items-center gap-2.5 text-sm text-slate-500">
-                      <Phone className="h-4 w-4 text-slate-400" />
-                      Phone
-                    </dt>
-                    <dd className="text-sm font-medium text-slate-900">{user.phone}</dd>
-                  </div>
-                )}
-
-                {user?.dateOfBirth && (
-                  <div className="flex items-center justify-between gap-4 py-3">
-                    <dt className="flex items-center gap-2.5 text-sm text-slate-500">
-                      <Calendar className="h-4 w-4 text-slate-400" />
-                      Date of birth
-                    </dt>
-                    <dd className="text-sm font-medium text-slate-900">{user.dateOfBirth}</dd>
-                  </div>
-                )}
-
-                {user?.gender && (
-                  <div className="flex items-center justify-between gap-4 py-3">
-                    <dt className="flex items-center gap-2.5 text-sm text-slate-500">
-                      <VenetianMask className="h-4 w-4 text-slate-400" />
-                      Gender
-                    </dt>
-                    <dd className="text-sm font-medium capitalize text-slate-900">{user.gender}</dd>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-4 py-3">
-                  <dt className="flex items-center gap-2.5 text-sm text-slate-500">
-                    <ShieldCheck className="h-4 w-4 text-slate-400" />
-                    Role
-                  </dt>
-                  <dd>
-                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-700">
-                      {user?.role}
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-            </section>
+            {user && <EditProfileForm user={user} />}
 
             <section className="flex flex-col justify-center gap-3 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 p-6 text-white shadow-lg shadow-indigo-500/30">
               <Sparkles className="h-6 w-6" />

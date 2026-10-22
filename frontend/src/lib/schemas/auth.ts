@@ -12,6 +12,22 @@ export const signupSchema = z.object({
   gender: z.enum(genderOptions).optional().or(z.literal("")),
 });
 
+export const profileSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(50, "Max 50 characters"),
+  lastName: z.string().trim().min(1, "Last name is required").max(50, "Max 50 characters"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9\s\-()]{7,15}$/, "Enter a valid phone number")
+    .or(z.literal("")),
+  dateOfBirth: z
+    .string()
+    .refine((value) => value === "" || new Date(value) <= new Date(), {
+      message: "Date of birth cannot be in the future",
+    }),
+  gender: z.enum(genderOptions).or(z.literal("")),
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   password: z.string().min(1, "Password is required"),
@@ -26,6 +42,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
-export type LoginFormValues = z.infer<typeof loginSchema>;
+export type ProfileFormValues = z.infer<typeof profileSchema>;
+export type LoginFormValues =z.infer<typeof loginSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
